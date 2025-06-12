@@ -19,7 +19,7 @@ CharMVC/
 │   └── MistralService.cs   
 ├── Views/  
 │   └── Home      
-│        └── Index.cshtml  
+│     └── Index.cshtml  
 ├── appsettings.json     
 └── Program.cs    
 
