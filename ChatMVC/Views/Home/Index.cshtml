@@ -6,22 +6,29 @@
             <h5 class="mb-0 text-white">ChatMVC</h5>
         </div>
         <div class="card-body" id="chatMessages">
+            @if (Model.Messages == null || !Model.Messages.Any())
+            {
+                <div class="chat-message assistant">
+                    <i class="fas fa-robot robot-logo"></i>
+                    <div class="message-content typewriter-text" data-text="¡Hola! ¿En qué puedo ayudarte?">
+                    </div>
+                </div>
+            }
             @if (Model.Messages != null && Model.Messages.Any())
             {
                 foreach (var message in Model.Messages)
                 {
                     <div class="chat-message @(message.Role == "user" ? "user" : "assistant")">
-                        <div class="message-content">
+                        @if (message.Role == "assistant")
+                        {
+                            <i class="fas fa-robot robot-logo"></i>
+                        }
+                        <div class="message-content typewriter-text" data-text="@message.Content">
                             @message.Content
                         </div>
                     </div>
                 }
             }
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
         </div>
         <div class="card-footer">
             <form id="chatForm">
@@ -47,6 +54,45 @@
             // Initial scroll
             scrollToBottom();
 
+            // Store the typing indicator HTML
+            const typingIndicatorHtml = `
+                <div class="chat-message assistant typing-indicator-dynamic">
+                    <i class="fas fa-robot robot-logo"></i>
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+
+            // Apply typewriter effect to existing messages
+            applyTypeWriterEffect('.typewriter-text', 30, (element) => {
+                // Only add time to assistant messages (including the initial one)
+                if ($(element).closest('.chat-message').hasClass('assistant')) {
+                    $(element).append(` <span class="message-time">${getCurrentTime()}</span>`);
+                }
+            });
+
+            // Helper function to get current time
+            function getCurrentTime() {
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+            }
+
+            // Helper function to clean text from unwanted time formats from server
+            function cleanServerResponseText(text) {
+                // This regex will remove patterns like: 
+                // "XX HH:MM ", "HH:MM ", " (Hora: HH:MM)" from anywhere in the text.
+                // It also handles cases where there might be extra spaces.
+                let cleanedText = text.replace(/^\s*\d+\s*\d{1,2}:\d{2,3}\s*|\s*\(Hora:\s*\d{2}:\d{2}\)$/g, '').trim();
+                // Fallback for any remaining HH:MM or similar at the very beginning (e.g. if not preceded by a number)
+                cleanedText = cleanedText.replace(/^\d{1,2}:\d{2,3}\s*/, '').trim();
+                return cleanedText;
+            }
+
             // Handle form submission
             $('#chatForm').on('submit', function(e) {
                 e.preventDefault();
@@ -56,27 +102,33 @@
                 var message = messageInput.val().trim();
                 
                 if (message) {
+                    const currentTime = getCurrentTime();
+
                     // Display the user's message immediately
                     var userMessageHtml = `
                         <div class="chat-message user">
                             <div class="message-content">
-                                ${message}
+                                ${message} <span class="message-time">${currentTime}</span>
                             </div>
                         </div>
                     `;
                     $('#chatMessages').append(userMessageHtml);
 
-                    // Show writing indicator
-                    $('.typing-indicator').show();
+                    // Show writing indicator (dynamically add it)
+                    $('#chatMessages').append(typingIndicatorHtml);
                     scrollToBottom();
 
                     // Prepare the data for sending
                     var messages = [];
                     $('.chat-message').each(function() {
                         var role = $(this).hasClass('user') ? 'user' : 'assistant';
-                        var content = $(this).find('.message-content').text();
+                        // Extract content, removing the time span if present
+                        var content = $(this).find('.message-content').clone().children('.message-time').remove().end().text().trim();
                         messages.push({ role: role, content: content });
                     });
+
+                    // Clean the user's input message from any potential time string before sending to server
+                    const cleanedUserMessageForServer = message.replace(/ \(Hora: \d{2}:\d{2}\)$/, '').trim();
 
                     // Submit the form
                     $.ajax({
@@ -84,40 +136,43 @@
                         type: 'POST',
                         contentType: 'application/json',
                         data: JSON.stringify({
-                            newMessage: message,
+                            newMessage: cleanedUserMessageForServer,
                             messages: messages
                         }),
                         success: function(response) {
-                            // Hide typing indicator
-                            $('.typing-indicator').hide();
+                            // Hide typing indicator (remove it)
+                            $('.typing-indicator-dynamic').remove();
+
+                            // Clean the response from any server-added time string
+                            const cleanedResponse = cleanServerResponseText(response);
 
                             // Create element for the response
-                            var responseElement = $('<div class="chat-message assistant"><div class="message-content"></div></div>');
+                            var responseElement = $('<div class="chat-message assistant"><i class="fas fa-robot robot-logo"></i><div class="message-content typewriter-text"></div></div>');
                             $('#chatMessages').append(responseElement);
 
-                            // Using Typed.js for the typing effect
-                            var typed = new Typed(responseElement.find('.message-content')[0], {
-                                strings: [response],
-                                typeSpeed: 30,
-                                showCursor: false,
-                                onComplete: function() {
-                                    scrollToBottom();
-                                }
+                            // Apply typewriter effect to the new message
+                            typeWriterEffect(responseElement.find('.message-content')[0], cleanedResponse, 30, function() {
+                                responseElement.find('.message-content').append(` <span class="message-time">${getCurrentTime()}</span>`);
+                                scrollToBottom(); // Scroll to bottom after typing and time added
                             });
 
                             // Clear the input
                             messageInput.val('');
                         },
                         error: function() {
-                            $('.typing-indicator').hide();
-                            $('#chatMessages').append(`
-                                <div class="chat-message assistant">
-                                    <div class="message-content">
-                                        Lo siento, hubo un error al procesar tu mensaje.
-                                    </div>
-                                </div>
-                            `);
-                            scrollToBottom();
+                            // Hide typing indicator (remove it)
+                            $('.typing-indicator-dynamic').remove();
+                            var errorMessage = 'Lo siento, hubo un error al procesar tu mensaje.';
+                            
+                            // Clean the error message from any server-added time string
+                            const cleanedErrorMessage = cleanServerResponseText(errorMessage);
+
+                            var errorElement = $('<div class="chat-message assistant"><i class="fas fa-robot robot-logo"></i><div class="message-content typewriter-text"></div></div>');
+                            $('#chatMessages').append(errorElement);
+                            typeWriterEffect(errorElement.find('.message-content')[0], cleanedErrorMessage, 30, function() {
+                                errorElement.find('.message-content').append(` <span class="message-time">${getCurrentTime()}</span>`);
+                                scrollToBottom(); // Scroll to bottom after typing and time added
+                            });
                         }
                     });
                 }

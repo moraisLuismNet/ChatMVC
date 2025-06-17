@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ChatMVC.Models;
 using ChatMVC.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace ChatMVC.Controllers
 {
@@ -39,15 +40,21 @@ namespace ChatMVC.Controllers
                 // Get a response from Mistral
                 var response = await _mistralService.GetChatCompletionAsync(model.Messages);
 
-                // Add assistant response
-                model.Messages.Add(new ChatMessage { Role = "assistant", Content = response });
+                // Clean the response of any time patterns added by the server
+                string cleanedResponse = response;
+                cleanedResponse = Regex.Replace(cleanedResponse, @"\s*\(Hora:\s*\d{2}:\d{2}\)$", "").Trim();
+                cleanedResponse = Regex.Replace(cleanedResponse, @"^\s*\d{1,2}:\d{2,3}\s*", "").Trim();
 
-                return Json(response);
+                // Add assistant response
+                model.Messages.Add(new ChatMessage { Role = "assistant", Content = cleanedResponse });
+
+                return Json(cleanedResponse);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing chat message");
-                return Json("Sorry, an error occurred while processing your message");
+                // The literal error message should not contain the server time, so it is not cleaned up here
+                return Json("Lo siento, hubo un error al procesar tu mensaje");
             }
         }
 
