@@ -19,7 +19,13 @@ namespace ChatMVC.Controllers
 
         public IActionResult Index()
         {
-            var viewModel = new ChatViewModel();
+            var viewModel = new ChatViewModel
+            {
+                Messages = new List<ChatMessage>
+                {
+                    new ChatMessage { Role = "assistant", Content = "¡Hola! ¿En qué puedo ayudarte?" }
+                }
+            };
             return View(viewModel);
         }
 
@@ -40,9 +46,11 @@ namespace ChatMVC.Controllers
                 // Get a response from Mistral
                 var response = await _mistralService.GetChatCompletionAsync(model.Messages);
 
-                // Clean the response of any time patterns added by the server
+                // *** Importante: Limpiar la respuesta de cualquier patrón de hora añadido por el servidor ***
                 string cleanedResponse = response;
+                // Remover " (Hora: HH:MM)" del final
                 cleanedResponse = Regex.Replace(cleanedResponse, @"\s*\(Hora:\s*\d{2}:\d{2}\)$", "").Trim();
+                // Remover "HH:MMM " o similar del principio
                 cleanedResponse = Regex.Replace(cleanedResponse, @"^\s*\d{1,2}:\d{2,3}\s*", "").Trim();
 
                 // Add assistant response
@@ -53,7 +61,7 @@ namespace ChatMVC.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing chat message");
-                // The literal error message should not contain the server time, so it is not cleaned up here
+                // El mensaje de error literal no debería contener la hora del servidor, así que no se limpia aquí.
                 return Json("Lo siento, hubo un error al procesar tu mensaje");
             }
         }
