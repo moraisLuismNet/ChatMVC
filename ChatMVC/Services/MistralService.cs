@@ -31,7 +31,7 @@ namespace ChatMVC.Services
 
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
-            _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/yourusername/ChatMVC");
+            _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/moraisLuismNet/ChatMVC");
             _httpClient.DefaultRequestHeaders.Add("X-Title", "ChatMVC");
         }
 

@@ -4,7 +4,7 @@
 
 ![ChatAPI](img/ChatMVC_01.png)
 
-CharMVC/  
+ChatMVC/  
 ├── Controllers/  
 │   └── HomeController.cs  
 ├── Models/  
